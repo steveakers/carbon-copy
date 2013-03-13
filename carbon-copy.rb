@@ -57,23 +57,26 @@ end
 def load_data(jobj, host, port, verbose, replay, run_time)
   trap("INT") { puts " ABORTED"; exit }
   
-  jobj.each do |o|
-    metric    = o["target"]
-    data_time = replay ? o["datapoints"].first[1] : o["datapoints"].last[1]
-    offset    = run_time - data_time
+  targets    = jobj.size - 1
+  datapoints = jobj.first["datapoints"].size - 1
+  interval   = jobj.first["datapoints"][1][1] - jobj.first["datapoints"][0][1]
+  data_time  = replay ? jobj.first["datapoints"].first[1] : jobj.first["datapoints"].last[1]
+  offset     = run_time - data_time
 
-    graphite_socket host, port do |sock|
-      o["datapoints"].each do |d|
-        value    = d[0]
-        new_time = d[1] + offset
+  graphite_socket host, port do |sock|
+    for d in 0..datapoints
+      for t in 0..targets
+        metric   = jobj[t]["target"]
+        value    = jobj[t]["datapoints"][d][0]
+        new_time = jobj[t]["datapoints"][d][1] + offset
         message  = "#{metric} #{value || 0.0} #{new_time}\n"
 
-        sleep(10) while replay && new_time > Time.now.to_i
         puts message if verbose
         sock.write message
-      end   
-    end 
-  end
+      end
+      sleep(interval)
+    end
+  end  
 end
 
 
